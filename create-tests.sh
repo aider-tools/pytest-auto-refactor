@@ -27,9 +27,16 @@ git config --global --add safe.directory /workspace/${REPO_NAME}
 export SOURCE_CODE="app.py"
 export TEST_CODE="test_app.py"
 
+if [ ! -f "/workspace/${REPO_NAME}/${SOURCE_CODE}" ]; then
+    echo "The source code file ${SOURCE_CODE} does not exist in the repository. Exiting..."
+    exit 1
+fi
+
 # Create the test code file if it doesn't exist
 if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
     echo "Creating ${TEST_CODE}..."
+    touch /workspace/${REPO_NAME}/${TEST_CODE}
+    git commit -m "Created ${TEST_CODE} file" --allow-empty
     aider ${SOURCE_CODE} \
         --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
         --auto-commits --auto-test --yes --suggest-shell-commands \
