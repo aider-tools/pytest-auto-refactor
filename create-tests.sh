@@ -24,8 +24,8 @@ cd /workspace/${REPO_NAME}
 git config --global --add safe.directory /workspace/${REPO_NAME}
 
 # Define the source and test code files
-export SOURCE_CODE="app.py"
-export TEST_CODE="test_app.py"
+export SOURCE_CODE="app.py,another_app.py"
+#export TEST_CODE="test_app.py"
 
 if [ ! -f "/workspace/${REPO_NAME}/${SOURCE_CODE}" ]; then
     echo "The source code file ${SOURCE_CODE} does not exist in the repository. Exiting..."
@@ -40,7 +40,7 @@ if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
     aider ${SOURCE_CODE} \
         --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
         --auto-commits --auto-test --yes --suggest-shell-commands \
-        --message "Create initial test for ${SOURCE_CODE}" \
+        --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
         --edit-format diff
 
     # Stage and commit changes
