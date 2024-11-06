@@ -91,7 +91,7 @@ RUN set -xe \
     && mkdir -p /workspace \
     && chown -R qauser:qauser  /workspace \
     && chown -R qauser:qauser /opt/qauser-venv \
-    &&  chmod -R u+w /opt/qauser-venv
+    &&  chmod -R u+w,g+w /opt/qauser-venv
 
     
 
