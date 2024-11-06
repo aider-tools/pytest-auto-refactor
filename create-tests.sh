@@ -24,7 +24,8 @@ cd /workspace/${REPO_NAME}
 git config --global --add safe.directory /workspace/${REPO_NAME}
 
 # Define the source and test code files
-export SOURCE_CODE="app.py,another_app.py"
+SOURCE_CODES=("app.py" "another_app.py")
+export TEST_CODE="test_app.py"
 #export TEST_CODE="test_app.py"
 
 if [ ! -f "/workspace/${REPO_NAME}/${SOURCE_CODE}" ]; then
@@ -37,15 +38,17 @@ if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
     echo "Creating ${TEST_CODE}..."
     touch /workspace/${REPO_NAME}/${TEST_CODE}
     git commit -m "Created ${TEST_CODE} file" --allow-empty
-    aider ${SOURCE_CODE} \
-        --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
-        --auto-commits --auto-test --yes --suggest-shell-commands \
-        --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
-        --edit-format diff
+    for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
+        aider ${SOURCE_CODE} \
+            --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
+            --auto-commits --auto-test --yes --suggest-shell-commands \
+            --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
+            --edit-format diff
+    done
 
     # Stage and commit changes
     git add "${TEST_CODE}"
-    git commit -m "Created initial test for ${SOURCE_CODE}"
+    git commit -m "Created initial test for ${SOURCE_CODES[@]}"
 
     # Push changes
     git push
@@ -64,6 +67,7 @@ while IFS= read -r line; do
     Explain the nature of the errors, the steps you took to resolve them, \
     and any potential improvements or alternative solutions that may be applicable."
 
+for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
     aider ${SOURCE_CODE}  \
         --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
         --auto-commits --auto-test --yes --suggest-shell-commands \
@@ -77,6 +81,7 @@ while IFS= read -r line; do
     # Push changes
     git push
     git config --global credential.helper store
+done
 
     # Optional: Wait before proceeding to the next iteration
     sleep ${SLEEP_TIME}
