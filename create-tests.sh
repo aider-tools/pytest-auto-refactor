@@ -27,6 +27,24 @@ git config --global --add safe.directory /workspace/${REPO_NAME}
 export SOURCE_CODE="app.py"
 export TEST_CODE="test_app.py"
 
+# Create the test code file if it doesn't exist
+if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
+    echo "Creating ${TEST_CODE}..."
+    aider ${SOURCE_CODE} \
+        --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
+        --auto-commits --auto-test --yes --suggest-shell-commands \
+        --message "Create initial test for ${SOURCE_CODE}" \
+        --edit-format diff
+
+    # Stage and commit changes
+    git add "${TEST_CODE}"
+    git commit -m "Created initial test for ${SOURCE_CODE}"
+
+    # Push changes
+    git push
+    git config --global credential.helper store
+fi
+
 # Run pytest on the test code
 ARCHITECT_MESSAGE=$(pytest /workspace/${TEST_CODE} 2>&1 || true)
 echo "Processed TEST CODE: ${TEST_CODE}"
