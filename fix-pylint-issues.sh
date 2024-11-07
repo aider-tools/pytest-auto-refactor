@@ -1,54 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-function pause(){
- read -s -n 1 -p "Press any key to continue . . ."
- echo ""
-}
-
-# Define the model and editor model (Ensure these variables are set in your environment)
-# export OLLAMA_API_BASE=http://ollama.ollama.svc.cluster.local:11434
-# export MODEL="ollama/granite3-dense:8b"
-# export EDITOR_MODEL="ollama/granite3-dense:8b"
-export SLEEP_TIME=30
-
-# Testing Configure Git
-# git clone https://github.com/tosin2013/ocp4-disconnected-helper.git
-cd /workspace/${REPO_NAME}
-git config --global --add safe.directory /workspace/${REPO_NAME}
-
-
-# Define the files to refactor
-#export PLAYBOOKS_DIR="playbooks/"
-#export TASKS_DIR="playbooks/tasks/"
-
-for FILE in ${PLAYBOOKS_DIR}*.yml ${TASKS_DIR}*.yml; do
-    export ARCHITECT_MESSAGE="$(ansible-lint --offline -p -f pep8 ${FILE})"
-    echo "Processed FILENAME: ${FILE}"#!/bin/bash
-#set -euo pipefail
-
-source /opt/qauser-venv/bin/activate
-
 # Function to pause execution
 function pause(){
     read -s -n 1 -p "Press any key to continue . . ."
     echo ""
 }
 
-# Set environment variables
+# Set environment variables with defaults if not already set
 export OLLAMA_API_BASE=${OLLAMA_API_BASE:-"http://ollama.ollama.svc.cluster.local:11434"}
 export MODEL=${MODEL:-"ollama/granite3-dense:8b"}
 export EDITOR_MODEL=${EDITOR_MODEL:-"ollama/granite3-dense:8b"}
 export SLEEP_TIME=${SLEEP_TIME:-30}
 export REPO_NAME=${REPO_NAME:-"your-repo-name"}
 export CONFIRM_BEFORE_AIDER=${CONFIRM_BEFORE_AIDER:-false}
-export REQUREMENTS_FILE=${REQUREMENTS_FILE:-"requirements.txt"}
+export REQUIREMENTS_FILE=${REQUIREMENTS_FILE:-"requirements.txt"}
 
-# Function to confirm before running aider
+# Confirm before running aider function
 function confirm_before_aider() {
     if [ "$CONFIRM_BEFORE_AIDER" = true ]; then
         read -p "Do you want to continue with aider? (y/n) " -n 1 -r
-        echo    # (optional) move to a new line
+        echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             echo "Aborting aider execution."
             exit 1
@@ -56,149 +28,52 @@ function confirm_before_aider() {
     else 
         echo "Sleeping for ${SLEEP_TIME} seconds before running aider..."
         sleep ${SLEEP_TIME}
-        rm -rf /workspace/${REPO_NAME}/.aider.input.history /workspace/${REPO_NAME}/.aider.chat.history.md /workspace/${REPO_NAME}/.aider.tags.cache.v3
     fi
 }
 
-
-# Clone the repository if it doesn't exist
+# Clone repository if not already cloned
 if [ ! -d "/workspace/${REPO_NAME}" ]; then
     git clone https://github.com/your-username/${REPO_NAME}.git /workspace/${REPO_NAME}
 fi
 
-# Navigate to the repository
 cd /workspace/${REPO_NAME}
 git config --global --add safe.directory /workspace/${REPO_NAME}
 
-# Convert SOURCE_CODES into an array
-IFS=',' read -r -a SOURCE_CODES <<< "$SOURCE_CODES"
-
-# Ensure each source file exists
-for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
-    if [ ! -f "/workspace/${REPO_NAME}/${SOURCE_CODE}" ]; then
-        echo "The source code file ${SOURCE_CODE} does not exist in the repository. Exiting..."
-        exit 1
-    fi
-done
-
-# Install the required dependencies
-if [ ! -f "/workspace/${REPO_NAME}/${REQUREMENTS_FILE}" ]; then
-    echo "The requirements file ${REQUREMENTS_FILE} does not exist in the repository. Exiting..."
+# Check for requirements file and install dependencies
+if [ ! -f "/workspace/${REPO_NAME}/${REQUIREMENTS_FILE}" ]; then
+    echo "The requirements file ${REQUIREMENTS_FILE} does not exist. Exiting..."
     exit 1
 fi
-/opt/qauser-venv/bin/pip install  -r "/workspace/${REPO_NAME}/${REQUREMENTS_FILE}"
+source /opt/qauser-venv/bin/activate
+/opt/qauser-venv/bin/pip install -r "/workspace/${REPO_NAME}/${REQUIREMENTS_FILE}"
 
-# Create the test code file if it doesn't exist
-
-if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
-    echo "Creating ${TEST_CODE}..."
-    touch /workspace/${REPO_NAME}/${TEST_CODE}
-    git commit -m "Created ${TEST_CODE} file" --allow-empty
-
-
-    for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
-        # Echo the aider command to be run
-        echo "Running aider with the following command:"
-        echo "aider \"$SOURCE_CODE\" \"$TEST_CODE\" \\"
-        echo "      --architect --model \"$MODEL\" --editor-model \"$EDITOR_MODEL\" \\"
-        echo "      --auto-commits --auto-test --yes --suggest-shell-commands \\"
-        echo "      --message \"Create initial test for ${SOURCE_CODE} named ${TEST_CODE}\" \\"
-        echo "      --edit-format diff"
-
-        confirm_before_aider
-
-        # Execute the aider command
-        aider "$SOURCE_CODE" "$TEST_CODE" \
-            --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
-            --auto-commits --auto-test --yes --suggest-shell-commands \
-            --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
-            --edit-format diff
-    done
-
-    # Stage and commit changes
-    git add "${TEST_CODE}"
-    git commit -m "Created initial test for ${SOURCE_CODES[*]}"
-
-    # Push changes
-    git push
-    git config --global credential.helper store
-fi
-
-# Run pytest on the test code
-ARCHITECT_MESSAGE=$(pytest "/workspace/${REPO_NAME}/${TEST_CODE}")
-echo "Processed TEST CODE: ${TEST_CODE}"
-echo "pytest output: $ARCHITECT_MESSAGE"
-
-# Process each line of pytest output
-PROMPT="You are an AI language model assisting a developer with the action \"Debug\" related to \"/workspace/${TEST_CODE}\" and \"/workspace/${SOURCE_CODES[*]}\". \
-The following pytest error occurred in the context of \"$ARCHITECT_MESSAGE\". \
-Explain the nature of the errors, the steps you took to resolve them, \
-and any potential improvements or alternative solutions that may be applicable."
-echo "$PROMPT"
-sleep 5s
-
+# Process each source code file using pylint
 for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
-    # Echo the aider command with resolved variables
-    echo "Running aider with the following command:"
-    echo "aider \"$SOURCE_CODE\" \"$TEST_CODE\" \\"
-    echo "      --architect --model \"$MODEL\" --editor-model \"$EDITOR_MODEL\" \\"
-    echo "      --auto-commits --auto-test --yes --suggest-shell-commands \\"
-    echo "      --message \"$PROMPT\" \\"
-    echo "      --edit-format diff"
-
-    confirm_before_aider
+    echo "Running pylint on ${SOURCE_CODE}"
     
-    # Execute the aider command
-    aider "$SOURCE_CODE" "$TEST_CODE" \
+    # Run pylint and capture output
+    ARCHITECT_MESSAGE=$(pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}")
+    echo "Processed SOURCE CODE: ${SOURCE_CODE}"
+    echo "pylint output: $ARCHITECT_MESSAGE"
+
+    # Build a single prompt for all pylint messages in this file
+    PROMPT="You are an AI language model assisting a developer with debugging and refactoring \"${SOURCE_CODE}\". \
+The following pylint messages occurred in the context of \"${SOURCE_CODE}\":\n${ARCHITECT_MESSAGE}\n \
+Explain the nature of these issues, steps to resolve them, and any potential improvements or alternative solutions."
+
+    # Run aider on the source code file with combined pylint feedback
+    echo "Running aider for pylint messages on ${SOURCE_CODE}"
+    confirm_before_aider
+    aider "${SOURCE_CODE}" \
         --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
         --auto-commits --auto-test --yes --suggest-shell-commands \
-        --message "$PROMPT" --test-cmd "pytest /workspace/${REPO_NAME}/${TEST_CODE}" \
-        --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE}" \
-        --edit-format diff
+        --message "$PROMPT" --edit-format diff
 
     # Stage and commit changes
-    git add "$SOURCE_CODE"
-    git commit -m "Refactored ${SOURCE_CODE} based on: $line"
+    git add "${SOURCE_CODE}"
+    git commit -m "Refactored ${SOURCE_CODE} based on pylint feedback"
 done
 
-# Push changes
+# Push all changes
 git push
 git config --global credential.helper store
-
-source /opt/qauser-venv/bin/activate
-python -m pytest "/workspace/${REPO_NAME}/${TEST_CODE}"
-
-python3 /workspace/${REPO_NAME}/app.py
-
-
-
-    while IFS= read -r line
-    do
-        echo "Processing: $line"
-        # https://webutility.io/chatgpt-prompt-generator-for-coders
-        PROMPT="You are an AI language model assisting a developer with the action \"Debug\" related to \"${FILE}\". \
-        The following ansible-lint error occurred in the context of \"$line\". \
-        Explain the nature of the errors, the steps you took to resolve them, \
-        and any potential improvements or alternative solutions that may be applicable."
-
-        aider ${FILE} \
-          --architect --model "$MODEL" --editor-model $EDITOR_MODEL \
-          --auto-commits --auto-test --yes --suggest-shell-commands \
-          --message "${line}" \
-          --edit-format diff
-
-        # Stage and commit changes
-        #git add "${FILE}"
-        #git commit -m "Refactored ${FILE} based on: ${line}"
-        
-        # Push changes
-        git push
-        git config --global credential.helper store
-
-        # Optional: Wait for user input before proceeding to the next file
-        sleep ${SLEEP_TIME}
-        
-        # Clean up aider history files
-        rm -rf .aider.input.history .aider.chat.history.md .aider.tags.cache.v3
-    done <<< "$ARCHITECT_MESSAGE"
-done
