@@ -85,13 +85,14 @@ ENV PATH="/opt/qauser-venv/bin:$PATH"
 
 # Create `qauser` user with sudo permissions
 RUN set -xe \
-    && useradd -m  qauser \
+    && groupadd -g 1001 qauser \
+    && useradd -m -u 1001 -g 1001 qauser \
     && echo "qauser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/qauser \
     && chmod 0440 /etc/sudoers.d/qauser \
     && mkdir -p /workspace \
-    && chown -R qauser:qauser  /workspace \
+    && chown -R qauser:qauser /workspace \
     && chown -R qauser:qauser /opt/qauser-venv \
-    &&  chmod -R u+w,g+w /opt/qauser-venv
+    && chmod -R u+w,g+w /opt/qauser-venv
 
     
 
@@ -99,9 +100,6 @@ RUN set -xe \
 WORKDIR /qauser
 
 # Switch to 'qauser' user
-USER qauser
-
-# Switch to the `qauser` user
 USER qauser
 
 COPY entrypoint.sh /opt/qauser-venv/bin
