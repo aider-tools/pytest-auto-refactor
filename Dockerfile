@@ -103,7 +103,7 @@ WORKDIR /qauser
 USER qauser
 
 COPY entrypoint.sh /opt/qauser-venv/bin
-COPY create-tests.sh /opt/qauser-venv/
+COPY create-tests.sh /opt/qauser-venv/bin
 COPY fix-pylint-issues.sh /opt/qauser-venv/bin
 # COPY versions.sh /opt/qauser-venv/bin
 

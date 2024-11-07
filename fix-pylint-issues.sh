@@ -39,13 +39,23 @@ fi
 cd /workspace/${REPO_NAME}
 git config --global --add safe.directory /workspace/${REPO_NAME}
 
-# Check for requirements file and install dependencies
-if [ ! -f "/workspace/${REPO_NAME}/${REQUIREMENTS_FILE}" ]; then
-    echo "The requirements file ${REQUIREMENTS_FILE} does not exist. Exiting..."
+# Convert SOURCE_CODES into an array
+IFS=',' read -r -a SOURCE_CODES <<< "$SOURCE_CODES"
+
+# Ensure each source file exists
+for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
+    if [ ! -f "/workspace/${REPO_NAME}/${SOURCE_CODE}" ]; then
+        echo "The source code file ${SOURCE_CODE} does not exist in the repository. Exiting..."
+        exit 1
+    fi
+done
+
+# Install the required dependencies
+if [ ! -f "/workspace/${REPO_NAME}/${REQUREMENTS_FILE}" ]; then
+    echo "The requirements file ${REQUREMENTS_FILE} does not exist in the repository. Exiting..."
     exit 1
 fi
-source /opt/qauser-venv/bin/activate
-/opt/qauser-venv/bin/pip install -r "/workspace/${REPO_NAME}/${REQUIREMENTS_FILE}"
+/opt/qauser-venv/bin/pip install  -r "/workspace/${REPO_NAME}/${REQUREMENTS_FILE}"
 
 # Process each source code file using pylint
 for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
@@ -55,6 +65,12 @@ for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
     ARCHITECT_MESSAGE=$(pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}")
     echo "Processed SOURCE CODE: ${SOURCE_CODE}"
     echo "pylint output: $ARCHITECT_MESSAGE"
+
+    # Check if pylint output indicates a perfect score and skip if so
+    if echo "$ARCHITECT_MESSAGE" | grep -q "Your code has been rated at 10.00/10"; then
+        echo "No issues detected in ${SOURCE_CODE}. Skipping aider."
+        continue
+    fi
 
     # Build a single prompt for all pylint messages in this file
     PROMPT="You are an AI language model assisting a developer with debugging and refactoring \"${SOURCE_CODE}\". \
