@@ -86,7 +86,8 @@ if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
             --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
             --auto-commits --auto-test --yes --suggest-shell-commands \
             --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
-            --edit-format diff
+            --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
+            --edit-format diff --editor-edit-format diff
     done
 
     # Stage and commit changes
@@ -128,7 +129,8 @@ for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
         --auto-commits --auto-test --yes --suggest-shell-commands \
         --message "$PROMPT" --test-cmd "pytest /workspace/${REPO_NAME}/${TEST_CODE}" \
         --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE}" \
-        --edit-format diff
+        --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
+        --edit-format diff  --editor-edit-format diff
 
     # Stage and commit changes
     git add "$SOURCE_CODE"

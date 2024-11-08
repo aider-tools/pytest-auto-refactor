@@ -1,6 +1,7 @@
 #!/bin/bash
-set -euo pipefail
+#set -euo pipefail
 
+source /opt/qauser-venv/bin/activate
 # Function to pause execution
 function pause(){
     read -s -n 1 -p "Press any key to continue . . ."
@@ -83,7 +84,8 @@ Explain the nature of these issues, steps to resolve them, and any potential imp
     aider "${SOURCE_CODE}" \
         --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
         --auto-commits --auto-test --yes --suggest-shell-commands \
-        --message "$PROMPT" --edit-format diff
+        --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
+        --message "$PROMPT" --edit-format diff --editor-edit-format diff
 
     # Stage and commit changes
     git add "${SOURCE_CODE}"
