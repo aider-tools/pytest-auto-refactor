@@ -84,7 +84,7 @@ Explain the nature of these issues, steps to resolve them, and any potential imp
     aider "${SOURCE_CODE}" \
         --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
         --auto-commits --auto-test --yes --suggest-shell-commands \
-        --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
+        --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --test-cmd 'pytest' --show-diffs  \
         --message "$PROMPT" --edit-format diff --editor-edit-format diff
 
     # Stage and commit changes

@@ -129,7 +129,7 @@ for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
         --auto-commits --auto-test --yes --suggest-shell-commands \
         --message "$PROMPT" --test-cmd "pytest /workspace/${REPO_NAME}/${TEST_CODE}" \
         --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE}" \
-        --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
+        --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --test-cmd 'pytest' --show-diffs  \
         --edit-format diff  --editor-edit-format diff
 
     # Stage and commit changes
