@@ -26,7 +26,7 @@ function confirm_before_aider() {
             echo "Aborting aider execution."
             exit 1
         fi
-    else 
+    else
         echo "Sleeping for ${SLEEP_TIME} seconds before running aider..."
         sleep ${SLEEP_TIME}
     fi
@@ -39,6 +39,13 @@ fi
 
 cd /workspace/${REPO_NAME}
 git config --global --add safe.directory /workspace/${REPO_NAME}
+
+# Configure pylint settings
+cat <<EOF > /workspace/${REPO_NAME}/.pylintrc
+[MESSAGES CONTROL]
+disable=line-too-long,trailing-whitespace
+EOF
+
 
 # Convert SOURCE_CODES into an array
 IFS=',' read -r -a SOURCE_CODES <<< "$SOURCE_CODES"
@@ -61,35 +68,47 @@ fi
 # Process each source code file using pylint
 for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
     echo "Running pylint on ${SOURCE_CODE}"
-    
-    # Run pylint and capture output
-    ARCHITECT_MESSAGE=$(pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}")
+    echo "********************************************************"
+    pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}"
+    echo "********************************************************"
+    ARCHITECT_MESSAGE=$(pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}" | head -5)
     echo "Processed SOURCE CODE: ${SOURCE_CODE}"
     echo "pylint output: $ARCHITECT_MESSAGE"
 
-    # Check if pylint output indicates a perfect score and skip if so
-    if echo "$ARCHITECT_MESSAGE" | grep -q "Your code has been rated at 10.00/10"; then
-        echo "No issues detected in ${SOURCE_CODE}. Skipping aider."
-        continue
-    fi
+     while ! echo "$ARCHITECT_MESSAGE" | grep -q "Your code has been rated at 10.00/10" && [ ! -z "$ARCHITECT_MESSAGE" ]; do
+        echo "Code not yet rated at 10.00/10. Retrying..."
+        # Run pylint and capture output
+        ARCHITECT_MESSAGE=$(pylint "/workspace/${REPO_NAME}/${SOURCE_CODE}" | head -2)
+        echo "Processed SOURCE CODE: ${SOURCE_CODE}"
+        echo "pylint output: $ARCHITECT_MESSAGE"
 
-    # Build a single prompt for all pylint messages in this file
-    PROMPT="You are an AI language model assisting a developer with debugging and refactoring \"${SOURCE_CODE}\". \
-The following pylint messages occurred in the context of \"${SOURCE_CODE}\":\n${ARCHITECT_MESSAGE}\n \
-Explain the nature of these issues, steps to resolve them, and any potential improvements or alternative solutions."
+        # Check if pylint output indicates a perfect score and skip if so
+        if echo "$ARCHITECT_MESSAGE" | grep -q "Your code has been rated at 10.00/10"; then
+            echo "No issues detected in ${SOURCE_CODE}. Skipping aider."
+            continue
+        fi
 
-    # Run aider on the source code file with combined pylint feedback
-    echo "Running aider for pylint messages on ${SOURCE_CODE}"
-    confirm_before_aider
-    aider "${SOURCE_CODE}" \
-        --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
-        --auto-commits --auto-test --yes --suggest-shell-commands \
-        --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --test-cmd 'pytest' --show-diffs  \
-        --message "$PROMPT" --edit-format diff --editor-edit-format diff
+        # Build a single prompt for all pylint messages in this file
+        PROMPT="You are an AI language model assisting a developer with debugging and refactoring \"${SOURCE_CODE}\". \
+        The following pylint messages occurred in the context of \"${SOURCE_CODE}\":\n${ARCHITECT_MESSAGE}\n \
+        Explain the nature of these issues, steps to resolve them, and any potential improvements or alternative solutions."
 
+        # Run aider on the source code file with combined pylint feedback
+        echo "Running aider for pylint messages on ${SOURCE_CODE}"
+        confirm_before_aider
+
+        aider "${SOURCE_CODE}" \
+            --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
+            --auto-commits --auto-test --yes --suggest-shell-commands \
+            --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --show-diffs --message "$PROMPT" --edit-format whole --editor-edit-format diff
+        sleep 10  # Optional: wait for 5 seconds before retrying
+    done
+
+
+    #--test-cmd 'pytest'
     # Stage and commit changes
-    git add "${SOURCE_CODE}"
-    git commit -m "Refactored ${SOURCE_CODE} based on pylint feedback"
+    #git add "${SOURCE_CODE}"
+    #git commit -m "Refactored ${SOURCE_CODE} based on pylint feedback"
 done
 
 # Push all changes

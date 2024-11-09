@@ -1,6 +1,7 @@
 #!/bin/bash
 #set -euo pipefail
-
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+set -x
 source /opt/qauser-venv/bin/activate
 
 # Function to pause execution
@@ -87,7 +88,7 @@ if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
             --auto-commits --auto-test --yes --suggest-shell-commands \
             --message "Create initial test for ${SOURCE_CODE} named ${TEST_CODE}" \
             --max-chat-history-tokens 1000 --cache-prompts --map-refresh 5 --test-cmd 'pytest' --show-diffs  \
-            --edit-format diff --editor-edit-format diff
+            --edit-format whole --editor-edit-format diff
     done
 
     # Stage and commit changes
@@ -128,7 +129,7 @@ for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
         --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
         --auto-commits --auto-test --yes --suggest-shell-commands \
         --message "$PROMPT" --test-cmd "pytest /workspace/${REPO_NAME}/${TEST_CODE}" \
-        --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE}" \
+        --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE} | head -2" \
         --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --test-cmd 'pytest' --show-diffs  \
         --edit-format diff  --editor-edit-format diff
 
