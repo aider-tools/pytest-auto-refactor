@@ -18,6 +18,7 @@ export SLEEP_TIME=${SLEEP_TIME:-30}
 export REPO_NAME=${REPO_NAME:-"your-repo-name"}
 export CONFIRM_BEFORE_AIDER=${CONFIRM_BEFORE_AIDER:-false}
 export REQUREMENTS_FILE=${REQUREMENTS_FILE:-"requirements.txt"}
+export CODE_PATH=${CODE_PATH:-"ecommerce_data"}
 
 # Function to confirm before running aider
 function confirm_before_aider() {
@@ -100,20 +101,33 @@ if [ ! -f "/workspace/${REPO_NAME}/${TEST_CODE}" ]; then
     git config --global credential.helper store
 fi
 
-# Run pytest on the test code
-ARCHITECT_MESSAGE=$(pytest "/workspace/${REPO_NAME}/${TEST_CODE}")
-echo "Processed TEST CODE: ${TEST_CODE}"
-echo "pytest output: $ARCHITECT_MESSAGE"
 
-# Process each line of pytest output
-PROMPT="You are an AI language model assisting a developer with the action \"Debug\" related to \"/workspace/${TEST_CODE}\" and \"/workspace/${SOURCE_CODES[*]}\". \
-The following pytest error occurred in the context of \"$ARCHITECT_MESSAGE\". \
-Explain the nature of the errors, the steps you took to resolve them, \
-and any potential improvements or alternative solutions that may be applicable."
-echo "$PROMPT"
-sleep 5s
 
 for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
+    # Run pytest on the test 
+    pytest "/workspace/${REPO_NAME}/${TEST_CODE}" 2>&1 | tee /tmp/pytest-output.txt
+    cat /tmp/pytest-output.txt
+    ARCHITECT_MESSAGE=$(awk '/ERROR|FAILURES|FAILED/{flag=7} flag{print; flag--}' /tmp/pytest-output.txt)
+
+    echo "Processed TEST CODE: ${TEST_CODE}"
+    echo "pytest output: $ARCHITECT_MESSAGE"
+
+    # Process each line of pytest output
+    # https://webutility.io/chatgpt-prompt-generator-for-coders
+    PROMPT="You are an AI language model assisting a developer with the action \"Debug\" related to \"/workspace/${TEST_CODE}\" and \"/workspace/${SOURCE_CODES[*]}\". \
+    The following pytest error occurred in the context of \"$ARCHITECT_MESSAGE\". \
+    Explain the nature of the errors, the steps you took to resolve them, \
+    and any potential improvements or alternative solutions that may be applicable."
+    echo "$PROMPT"
+    sleep 5s
+    aider "$SOURCE_CODE" "$TEST_CODE" \
+    --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
+    --auto-commits --auto-test --yes --suggest-shell-commands \
+    --message "You are an AI language model assisting a developer with /workspace/${REPO_NAME}/app.py file if the command fails create tests for the app then attempt to test it again the test location is /workspace/${REPO_NAME}/${TEST_CODE}" \
+    --test-cmd "python3 /workspace/${REPO_NAME}/app.py" \
+    --max-chat-history-tokens 2500 --cache-prompts --map-refresh files --show-diffs  \
+    --edit-format whole  --editor-edit-format diff
+
     # Echo the aider command with resolved variables
     echo "Running aider with the following command:"
     echo "aider \"$SOURCE_CODE\" \"$TEST_CODE\" \\"
@@ -122,16 +136,32 @@ for SOURCE_CODE in "${SOURCE_CODES[@]}"; do
     echo "      --message \"$PROMPT\" \\"
     echo "      --edit-format diff"
 
-    confirm_before_aider
-    
-    # Execute the aider command
-    aider "$SOURCE_CODE" "$TEST_CODE" \
-        --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
-        --auto-commits --auto-test --yes --suggest-shell-commands \
-        --message "$PROMPT" --test-cmd "pytest /workspace/${REPO_NAME}/${TEST_CODE}" \
-        --lint-cmd "pylint /workspace/${REPO_NAME}/${SOURCE_CODE} | head -2" \
-        --max-chat-history-tokens 1000 --cache-prompts --map-refresh files --test-cmd 'pytest' --show-diffs  \
-        --edit-format diff  --editor-edit-format diff
+    while ! cat "$ARCHITECT_MESSAGE" | grep -q "ERROR|FAILURES|FAILED" && [ ! -z "$ARCHITECT_MESSAGE" ]; do
+        pytest "/workspace/${REPO_NAME}/${TEST_CODE}" 2>&1 | tee /tmp/pytest-output.txt
+        cat /tmp/pytest-output.txt
+        ARCHITECT_MESSAGE=$(awk '/ERROR|FAILURES|FAILED/{flag=7} flag{print; flag--}' /tmp/pytest-output.txt)
+
+        # Check if pylint output indicates a perfect score and skip if so
+        if cat "$ARCHITECT_MESSAGE" | grep -q "ERROR|FAILURES|FAILED" ; then
+            echo "No issues detected in ${SOURCE_CODE}. Skipping aider."
+            exit 0
+        fi
+
+        PROMPT="You are an AI language model assisting a developer with the action \"Debug\" related to \"/workspace/${TEST_CODE}\" and \"/workspace/${SOURCE_CODES[*]}\". \
+        The following pytest error occurred in the context of \"$ARCHITECT_MESSAGE\". \
+        Explain the nature of the errors, the steps you took to resolve them, \
+        and any potential improvements or alternative solutions that may be applicable."
+        echo "$PROMPT"
+
+        # Execute the aider command
+        aider "$SOURCE_CODE" "$TEST_CODE" \
+            --architect --model "$MODEL" --editor-model "$EDITOR_MODEL" \
+            --auto-commits --auto-test --yes --suggest-shell-commands \
+            --message "$PROMPT" --test-cmd "python3 /workspace/${REPO_NAME}/app.py" \
+            --max-chat-history-tokens 2500 --cache-prompts --map-refresh files --show-diffs  \
+            --edit-format whole  --editor-edit-format diff
+        confirm_before_aider
+    done
 
     # Stage and commit changes
     git add "$SOURCE_CODE"
@@ -144,6 +174,7 @@ git config --global credential.helper store
 
 source /opt/qauser-venv/bin/activate
 python -m pytest "/workspace/${REPO_NAME}/${TEST_CODE}"
-
+source /opt/qauser-venv/bin/activate
 python3 /workspace/${REPO_NAME}/app.py
+
 

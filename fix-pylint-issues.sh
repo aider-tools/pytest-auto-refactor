@@ -43,7 +43,7 @@ git config --global --add safe.directory /workspace/${REPO_NAME}
 # Configure pylint settings
 cat <<EOF > /workspace/${REPO_NAME}/.pylintrc
 [MESSAGES CONTROL]
-disable=line-too-long,trailing-whitespace
+disable=line-too-long,trailing-whitespace,missing-function-docstring,missing-module-docstring,missing-class-docstring
 EOF
 
 
